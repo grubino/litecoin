@@ -103,6 +103,8 @@ T* alignup(T* p)
 #define MAX_PATH            1024
 #endif
 
+void locking_callback(int mode, int i, const char* file, int line);
+
 inline void MilliSleep(int64 n)
 {
 // Boost's sleep_for was uninterruptable when backed by nanosleep from 1.50
@@ -133,20 +135,7 @@ inline void MilliSleep(int64 n)
 
 
 
-extern std::map<std::string, std::string> mapArgs;
-extern std::map<std::string, std::vector<std::string> > mapMultiArgs;
-extern bool fDebug;
-extern bool fDebugNet;
-extern bool fPrintToConsole;
-extern bool fPrintToDebugger;
-extern bool fDaemon;
-extern bool fServer;
-extern bool fCommandLine;
 extern std::string strMiscWarning;
-extern bool fTestNet;
-extern bool fBloomFilters;
-extern bool fNoListen;
-extern bool fLogTimestamps;
 extern volatile bool fReopenDebugLog;
 
 void RandAddSeed();
@@ -214,7 +203,6 @@ boost::filesystem::path GetPidFile();
 #ifndef WIN32
 void CreatePidFile(const boost::filesystem::path &path, pid_t pid);
 #endif
-void ReadConfigFile(std::map<std::string, std::string>& mapSettingsRet, std::map<std::string, std::vector<std::string> >& mapMultiSettingsRet);
 #ifdef WIN32
 boost::filesystem::path GetSpecialFolderPath(int nFolder, bool fCreate = true);
 #endif
@@ -373,51 +361,6 @@ inline bool IsSwitchChar(char c)
     return c == '-';
 #endif
 }
-
-/**
- * Return string argument or default value
- *
- * @param strArg Argument to get (e.g. "-foo")
- * @param default (e.g. "1")
- * @return command-line argument or default value
- */
-std::string GetArg(const std::string& strArg, const std::string& strDefault);
-
-/**
- * Return integer argument or default value
- *
- * @param strArg Argument to get (e.g. "-foo")
- * @param default (e.g. 1)
- * @return command-line argument (0 if invalid number) or default value
- */
-int64 GetArg(const std::string& strArg, int64 nDefault);
-
-/**
- * Return boolean argument or default value
- *
- * @param strArg Argument to get (e.g. "-foo")
- * @param default (true or false)
- * @return command-line argument or default value
- */
-bool GetBoolArg(const std::string& strArg, bool fDefault=false);
-
-/**
- * Set an argument if it doesn't already have a value
- *
- * @param strArg Argument to set (e.g. "-foo")
- * @param strValue Value (e.g. "1")
- * @return true if argument gets set, false if it already had a value
- */
-bool SoftSetArg(const std::string& strArg, const std::string& strValue);
-
-/**
- * Set a boolean argument if it doesn't already have a value
- *
- * @param strArg Argument to set (e.g. "-foo")
- * @param fValue Value (e.g. false)
- * @return true if argument gets set, false if it already had a value
- */
-bool SoftSetBoolArg(const std::string& strArg, bool fValue);
 
 /**
  * MWC RNG of George Marsaglia
@@ -606,5 +549,8 @@ template <typename Callable> void TraceThread(const char* name,  Callable func)
         PrintException(NULL, name);
     }
 }
+
+void update_config(const std::string& opt
+		   , const std::string& val);
 
 #endif

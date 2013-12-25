@@ -3,6 +3,8 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "util.h"
+
 #include "walletdb.h"
 #include "wallet.h"
 #include <boost/version.hpp>
@@ -11,6 +13,7 @@
 using namespace std;
 using namespace boost;
 
+#include "init.h"
 
 static uint64 nAccountingEntryNumber = 0;
 
@@ -413,20 +416,19 @@ DBErrors CWalletDB::LoadWallet(CWallet* pwallet)
             // Try to be tolerant of single corrupt records:
             string strType, strErr;
             if (!ReadKeyValue(pwallet, ssKey, ssValue, nFileVersion,
-                              vWalletUpgrade, fIsEncrypted, fAnyUnordered, strType, strErr))
-            {
-                // losing keys is considered a catastrophic error, anything else
-                // we assume the user can live with:
-                if (IsKeyType(strType))
+                              vWalletUpgrade, fIsEncrypted, fAnyUnordered, strType, strErr)) {
+	      // losing keys is considered a catastrophic error, anything else
+	      // we assume the user can live with:
+	      if (IsKeyType(strType)) {
                     result = DB_CORRUPT;
-                else
-                {
-                    // Leave other errors alone, if we try to fix them we might make things worse.
-                    fNoncriticalErrors = true; // ... but do warn the user there is something wrong.
-                    if (strType == "tx")
-                        // Rescan if there is a bad transaction record:
-                        SoftSetBoolArg("-rescan", true);
-                }
+	      } else {
+		// Leave other errors alone, if we try to fix them we might make things worse.
+		fNoncriticalErrors = true; // ... but do warn the user there is something wrong.
+		if (strType == "tx") {
+		  // Rescan if there is a bad transaction record:
+		  update_config("--rescan", "true");
+		}
+	      }
             }
             if (!strErr.empty())
                 printf("%s\n", strErr.c_str());
@@ -472,11 +474,13 @@ void ThreadFlushWalletDB(const string& strFile)
     RenameThread("bitcoin-wallet");
 
     static bool fOneThread;
-    if (fOneThread)
+    if (fOneThread) {
         return;
+    }
     fOneThread = true;
-    if (!GetBoolArg("-flushwallet", true))
-        return;
+    if (!user_options["flushwallet"].as<bool>()) {
+      return;
+    }
 
     unsigned int nLastSeen = nWalletDBUpdated;
     unsigned int nLastFlushed = nWalletDBUpdated;
@@ -544,7 +548,7 @@ bool BackupWallet(const CWallet& wallet, const string& strDest)
                 bitdb.mapFileUseCount.erase(wallet.strWalletFile);
 
                 // Copy wallet.dat
-                filesystem::path pathSrc = GetDataDir() / wallet.strWalletFile;
+                filesystem::path pathSrc = user_options["datadir"].as<fs::path>() / wallet.strWalletFile;
                 filesystem::path pathDest(strDest);
                 if (filesystem::is_directory(pathDest))
                     pathDest /= wallet.strWalletFile;

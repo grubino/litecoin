@@ -21,6 +21,7 @@
 #include <miniupnpc/upnperrors.h>
 #endif
 
+
 // Dump addresses to peers.dat every 15 minutes (900s)
 #define DUMP_ADDRESSES_INTERVAL 900
 
@@ -40,7 +41,6 @@ struct LocalServiceInfo {
 //
 // Global state variables
 //
-bool fDiscover = true;
 uint64 nLocalServices = NODE_NETWORK;
 static CCriticalSection cs_mapLocalHost;
 static map<CNetAddr, LocalServiceInfo> mapLocalHost;
@@ -79,7 +79,7 @@ void AddOneShot(string strDest)
 
 unsigned short GetListenPort()
 {
-    return (unsigned short)(GetArg("-port", GetDefaultPort()));
+  return user_options["port"].as<unsigned short>();
 }
 
 void CNode::PushGetBlocks(CBlockIndex* pindexBegin, uint256 hashEnd)
@@ -96,8 +96,9 @@ void CNode::PushGetBlocks(CBlockIndex* pindexBegin, uint256 hashEnd)
 // find 'best' local address for a particular peer
 bool GetLocal(CService& addr, const CNetAddr *paddrPeer)
 {
-    if (fNoListen)
-        return false;
+  if (!user_options.count("listen") or !user_options["listen"].as<bool>()) {
+    return false;
+  }
 
     int nBestScore = -1;
     int nBestReachability = -1;
@@ -215,7 +216,7 @@ bool AddLocal(const CService& addr, int nScore)
     if (!addr.IsRoutable())
         return false;
 
-    if (!fDiscover && nScore < LOCAL_MANUAL)
+    if (!(user_options.count("discover") and user_options["discover"].as<bool>()) and nScore < LOCAL_MANUAL)
         return false;
 
     if (IsLimited(addr))
@@ -477,18 +478,21 @@ CNode* ConnectNode(CAddress addrConnect, const char *pszDest)
 
     // Connect
     SOCKET hSocket;
-    if (pszDest ? ConnectSocketByName(addrConnect, hSocket, pszDest, GetDefaultPort()) : ConnectSocket(addrConnect, hSocket))
-    {
-        addrman.Attempt(addrConnect);
-
-        /// debug print
-        printf("connected %s\n", pszDest ? pszDest : addrConnect.ToString().c_str());
-
-        // Set to non-blocking
+    if (pszDest ? ConnectSocketByName(addrConnect
+				      , hSocket
+				      , pszDest
+				      , user_options["port"].as<unsigned int>()) : ConnectSocket(addrConnect, hSocket)) {
+      addrman.Attempt(addrConnect);
+      
+      /// debug print
+      printf("connected %s\n", pszDest ? pszDest : addrConnect.ToString().c_str());
+      
+      // Set to non-blocking
 #ifdef WIN32
         u_long nOne = 1;
-        if (ioctlsocket(hSocket, FIONBIO, &nOne) == SOCKET_ERROR)
+        if (ioctlsocket(hSocket, FIONBIO, &nOne) == SOCKET_ERROR) {
             printf("ConnectSocket() : ioctlsocket non-blocking setting failed, error %d\n", WSAGetLastError());
+	}
 #else
         if (fcntl(hSocket, F_SETFL, O_NONBLOCK) == SOCKET_ERROR)
             printf("ConnectSocket() : fcntl non-blocking setting failed, error %d\n", errno);
@@ -586,9 +590,8 @@ bool CNode::Misbehaving(int howmuch)
     }
 
     nMisbehavior += howmuch;
-    if (nMisbehavior >= GetArg("-banscore", 100))
-    {
-        int64 banTime = GetTime()+GetArg("-bantime", 60*60*24);  // Default 24-hour ban
+    if (nMisbehavior >= user_options["banscore"].as<int>()) {
+      int64 banTime = GetTime()+user_options["bantime"].as<unsigned int>();  // Default 24-hour ban
         printf("Misbehaving: %s (%d -> %d) DISCONNECTING\n", addr.ToString().c_str(), nMisbehavior-howmuch, nMisbehavior);
         {
             LOCK(cs_setBanned);
@@ -597,8 +600,9 @@ bool CNode::Misbehaving(int howmuch)
         }
         CloseSocketDisconnect();
         return true;
-    } else
+    } else {
         printf("Misbehaving: %s (%d -> %d)\n", addr.ToString().c_str(), nMisbehavior-howmuch, nMisbehavior);
+    }
     return false;
 }
 
@@ -875,7 +879,7 @@ void ThreadSocketHandler()
                     TRY_LOCK(pnode->cs_vRecvMsg, lockRecv);
                     if (lockRecv && (
                         pnode->vRecvMsg.empty() || !pnode->vRecvMsg.front().complete() ||
-                        pnode->GetTotalRecvSize() <= ReceiveFloodSize()))
+                        pnode->GetTotalRecvSize() <= user_options["maxreceivebuffer"].as<unsigned int>()))
                         FD_SET(pnode->hSocket, &fdsetRecv);
                 }
             }
@@ -1095,7 +1099,7 @@ void ThreadMapPort()
     r = UPNP_GetValidIGD(devlist, &urls, &data, lanaddr, sizeof(lanaddr));
     if (r == 1)
     {
-        if (fDiscover) {
+        if (user_options.count("discover") and user_options["discover"].as<bool>()) {
             char externalIPAddress[40];
             r = UPNP_GetExternalIPAddress(urls.controlURL, data.first.servicetype, externalIPAddress);
             if(r != UPNPCOMMAND_SUCCESS)
@@ -1208,7 +1212,7 @@ static const char *strTestNetDNSSeed[][2] = {
 
 void ThreadDNSAddressSeed()
 {
-    static const char *(*strDNSSeed)[2] = fTestNet ? strTestNetDNSSeed : strMainNetDNSSeed;
+    const char *(*strDNSSeed)[2] = user_options.count("testnet") and user_options["testnet"].as<bool>() ? strTestNetDNSSeed : strMainNetDNSSeed;
 
     int found = 0;
 
@@ -1225,7 +1229,7 @@ void ThreadDNSAddressSeed()
                 BOOST_FOREACH(CNetAddr& ip, vaddr)
                 {
                     int nOneDay = 24*3600;
-                    CAddress addr = CAddress(CService(ip, GetDefaultPort()));
+                    CAddress addr = CAddress(CService(ip, user_options["port"].as<unsigned int>()));
                     addr.nTime = GetTime() - 3*nOneDay - GetRand(4*nOneDay); // use a random age between 3 and 7 days old
                     vAdd.push_back(addr);
                     found++;
@@ -1360,17 +1364,13 @@ void static ProcessOneShot()
 void ThreadOpenConnections()
 {
     // Connect to specific addresses
-    if (mapArgs.count("-connect") && mapMultiArgs["-connect"].size() > 0)
-    {
-        for (int64 nLoop = 0;; nLoop++)
-        {
+  if (user_options.count("connect") && user_options["connect"].as< std::vector<std::string> >().size() > 0) {
+        for (int64 nLoop = 0;; nLoop++) {
             ProcessOneShot();
-            BOOST_FOREACH(string strAddr, mapMultiArgs["-connect"])
-            {
+            BOOST_FOREACH(string strAddr, user_options["connect"].as< std::vector<std::string> >()) {
                 CAddress addr;
                 OpenNetworkConnection(addr, NULL, strAddr.c_str());
-                for (int i = 0; i < 10 && i < nLoop; i++)
-                {
+                for (int i = 0; i < 10 && i < nLoop; i++) {
                     MilliSleep(500);
                 }
             }
@@ -1390,7 +1390,7 @@ void ThreadOpenConnections()
         boost::this_thread::interruption_point();
 
         // Add seed nodes if IRC isn't working
-        if (addrman.size()==0 && (GetTime() - nStart > 60) && !fTestNet)
+        if (addrman.size()==0 && (GetTime() - nStart > 60) && !(user_options.count("testnet") and user_options["testnet"].as<bool>()))
         {
             std::vector<CAddress> vAdd;
             for (unsigned int i = 0; i < ARRAYLEN(pnSeed); i++)
@@ -1402,7 +1402,7 @@ void ThreadOpenConnections()
                 const int64 nOneWeek = 7*24*60*60;
                 struct in_addr ip;
                 memcpy(&ip, &pnSeed[i], sizeof(ip));
-                CAddress addr(CService(ip, GetDefaultPort()));
+                CAddress addr(CService(ip, user_options["port"].as<unsigned int>()));
                 addr.nTime = GetTime()-GetRand(nOneWeek)-nOneWeek;
                 vAdd.push_back(addr);
             }
@@ -1455,7 +1455,7 @@ void ThreadOpenConnections()
                 continue;
 
             // do not allow non-default ports, unless after 50 invalid addresses selected already
-            if (addr.GetPort() != GetDefaultPort() && nTries < 50)
+            if (addr.GetPort() != user_options["port"].as<unsigned int>() && nTries < 50)
                 continue;
 
             addrConnect = addr;
@@ -1467,11 +1467,10 @@ void ThreadOpenConnections()
     }
 }
 
-void ThreadOpenAddedConnections()
-{
+void ThreadOpenAddedConnections() {
     {
         LOCK(cs_vAddedNodes);
-        vAddedNodes = mapMultiArgs["-addnode"];
+        vAddedNodes = user_options["addnode"].as< vector<std::string> >();
     }
 
     if (HaveNameProxy()) {
@@ -1479,8 +1478,9 @@ void ThreadOpenAddedConnections()
             list<string> lAddresses(0);
             {
                 LOCK(cs_vAddedNodes);
-                BOOST_FOREACH(string& strAddNode, vAddedNodes)
+                BOOST_FOREACH(string& strAddNode, vAddedNodes) {
                     lAddresses.push_back(strAddNode);
+		}
             }
             BOOST_FOREACH(string& strAddNode, lAddresses) {
                 CAddress addr;
@@ -1492,20 +1492,20 @@ void ThreadOpenAddedConnections()
         }
     }
 
-    for (unsigned int i = 0; true; i++)
-    {
+    for (unsigned int i = 0; true; i++) {
         list<string> lAddresses(0);
         {
             LOCK(cs_vAddedNodes);
-            BOOST_FOREACH(string& strAddNode, vAddedNodes)
+            BOOST_FOREACH(string& strAddNode, vAddedNodes) {
                 lAddresses.push_back(strAddNode);
+	    }
         }
 
         list<vector<CService> > lservAddressesToAdd(0);
         BOOST_FOREACH(string& strAddNode, lAddresses)
         {
             vector<CService> vservNode(0);
-            if(Lookup(strAddNode.c_str(), vservNode, GetDefaultPort(), fNameLookup, 0))
+            if(Lookup(strAddNode.c_str(), vservNode, user_options["port"].as<unsigned int>(), fNameLookup, 0))
             {
                 lservAddressesToAdd.push_back(vservNode);
                 {
@@ -1647,7 +1647,7 @@ void ThreadMessageHandler()
                     if (!ProcessMessages(pnode))
                         pnode->CloseSocketDisconnect();
 
-                    if (pnode->nSendSize < SendBufferSize())
+                    if (pnode->nSendSize < user_options["maxsendbuffer"].as<unsigned int>())
                     {
                         if (!pnode->vRecvGetData.empty() || (!pnode->vRecvMsg.empty() && pnode->vRecvMsg[0].complete()))
                         {
@@ -1776,7 +1776,7 @@ bool BindListenPort(const CService &addrBind, string& strError)
 
     vhListenSocket.push_back(hListenSocket);
 
-    if (addrBind.IsRoutable() && fDiscover)
+    if (addrBind.IsRoutable() and user_options.count("discover") and user_options["discover"].as<bool>())
         AddLocal(addrBind, LOCAL_BIND);
 
     return true;
@@ -1784,8 +1784,9 @@ bool BindListenPort(const CService &addrBind, string& strError)
 
 void static Discover()
 {
-    if (!fDiscover)
-        return;
+  if (!(user_options.count("discover") and user_options["discover"].as<bool>())) {
+    return;
+  }
 
 #ifdef WIN32
     // Get local host IP
@@ -1855,14 +1856,15 @@ void StartNode(boost::thread_group& threadGroup)
     // Start threads
     //
 
-    if (!GetBoolArg("-dnsseed", true))
+    if (!user_options["dnsseed"].as<bool>()) {
         printf("DNS seeding disabled\n");
-    else
+    } else {
         threadGroup.create_thread(boost::bind(&TraceThread<boost::function<void()> >, "dnsseed", &ThreadDNSAddressSeed));
+    }
 
 #ifdef USE_UPNP
     // Map ports with UPnP
-    MapPort(GetBoolArg("-upnp", USE_UPNP));
+    MapPort(user_options["upnp"].as<bool>());
 #endif
 
     // Send and receive from sockets, accept connections

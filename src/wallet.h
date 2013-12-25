@@ -17,6 +17,7 @@
 #include "ui_interface.h"
 #include "util.h"
 #include "walletdb.h"
+#include "db.h"
 
 class CAccountingEntry;
 class CWalletTx;
@@ -664,10 +665,10 @@ public:
             if (!pwallet->IsFromMe(*ptx))
                 return false;
 
-            if (mapPrev.empty())
-            {
-                BOOST_FOREACH(const CMerkleTx& tx, vtxPrev)
-                    mapPrev[tx.GetHash()] = &tx;
+            if (mapPrev.empty()) {
+	      BOOST_FOREACH(const CMerkleTx& tx, vtxPrev) {
+		mapPrev[tx.GetHash()] = &tx;
+	      }
             }
 
             BOOST_FOREACH(const CTxIn& txin, ptx->vin)

@@ -18,7 +18,11 @@ using namespace boost;
 
 bool CheckSig(vector<unsigned char> vchSig, const vector<unsigned char> &vchPubKey, const CScript &scriptCode, const CTransaction& txTo, unsigned int nIn, int nHashType, int flags);
 
+#include <boost/program_options.hpp>
 
+namespace po = boost::program_options;
+
+extern po::variables_map user_options;
 
 typedef vector<unsigned char> valtype;
 static const valtype vchFalse(0);
@@ -1056,8 +1060,8 @@ public:
         // (~200 bytes per cache entry times 50,000 entries)
         // Since there are a maximum of 20,000 signature operations per block
         // 50,000 is a reasonable default.
-        int64 nMaxCacheSize = GetArg("-maxsigcachesize", 50000);
-        if (nMaxCacheSize <= 0) return;
+      int64 nMaxCacheSize = user_options["maxsigcachesize"].as<int>();
+      if (nMaxCacheSize <= 0) return;
 
         boost::unique_lock<boost::shared_mutex> lock(cs_sigcache);
 

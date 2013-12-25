@@ -13,6 +13,10 @@
 
 using namespace std;
 
+#include <boost/program_options.hpp>
+namespace po = boost::program_options;
+extern po::variables_map user_options;
+
 
 //////////////////////////////////////////////////////////////////////////////
 //
@@ -489,7 +493,7 @@ bool CWallet::AddToWallet(const CWalletTx& wtxIn)
         NotifyTransactionChanged(this, hash, fInsertedNew ? CT_NEW : CT_UPDATED);
 
         // notify an external script when a wallet transaction comes in or is updated
-        std::string strCmd = GetArg("-walletnotify", "");
+        std::string strCmd = user_options["walletnotify"].as<std::string>();
 
         if ( !strCmd.empty())
         {
@@ -1542,7 +1546,7 @@ bool CWallet::NewKeyPool()
         if (IsLocked())
             return false;
 
-        int64 nKeys = max(GetArg("-keypool", 100), (int64)0);
+        int64 nKeys = max((int64)user_options["keypool"].as<int>(), (int64)0);
         for (int i = 0; i < nKeys; i++)
         {
             int64 nIndex = i+1;
@@ -1565,7 +1569,7 @@ bool CWallet::TopUpKeyPool()
         CWalletDB walletdb(strWalletFile);
 
         // Top up key pool
-        unsigned int nTargetSize = max(GetArg("-keypool", 100), 0LL);
+        unsigned int nTargetSize = max(user_options["-keypool"].as<unsigned int>(), 0u);
         while (setKeyPool.size() < (nTargetSize + 1))
         {
             int64 nEnd = 1;

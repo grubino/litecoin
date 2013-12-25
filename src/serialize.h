@@ -1168,13 +1168,14 @@ public:
     void ReadVersion()           { *this >> nVersion; }
     void WriteVersion()          { *this << nVersion; }
 
-    CAutoFile& read(char* pch, size_t nSize)
-    {
-        if (!file)
-            throw std::ios_base::failure("CAutoFile::read : file handle is NULL");
-        if (fread(pch, 1, nSize, file) != nSize)
-            setstate(std::ios::failbit, feof(file) ? "CAutoFile::read : end of file" : "CAutoFile::read : fread failed");
-        return (*this);
+    CAutoFile& read(char* pch, size_t nSize) {
+      if (!file) {
+	throw std::ios_base::failure("CAutoFile::read : file handle is NULL");
+      }
+      if (fread(pch, 1, nSize, file) != nSize) {
+	setstate(std::ios::failbit, feof(file) ? "CAutoFile::read : end of file" : "CAutoFile::read : fread failed");
+      }
+      return (*this);
     }
 
     CAutoFile& write(const char* pch, size_t nSize)

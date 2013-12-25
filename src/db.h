@@ -11,6 +11,14 @@
 #include <string>
 #include <vector>
 
+#include <boost/program_options.hpp>
+#include <boost/filesystem.hpp>
+
+namespace po = boost::program_options;
+namespace fs = boost::filesystem;
+
+extern po::variables_map user_options;
+
 #include <db_cxx.h>
 
 class CAddress;
@@ -28,8 +36,7 @@ void ThreadFlushWalletDB(const std::string& strWalletFile);
 bool BackupWallet(const CWallet& wallet, const std::string& strDest);
 
 
-class CDBEnv
-{
+class CDBEnv {
 private:
     bool fDbEnvInit;
     bool fMockDb;
@@ -86,10 +93,8 @@ public:
 
 extern CDBEnv bitdb;
 
-
 /** RAII class that provides access to a Berkeley database */
-class CDB
-{
+class CDB {
 protected:
     Db* pdb;
     std::string strFile;

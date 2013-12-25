@@ -24,12 +24,9 @@ enum DBErrors
 };
 
 /** Access to the wallet database (wallet.dat) */
-class CWalletDB : public CDB
-{
+class CWalletDB : public CDB {
 public:
-    CWalletDB(std::string strFilename, const char* pszMode="r+") : CDB(strFilename.c_str(), pszMode)
-    {
-    }
+    CWalletDB(std::string strFilename, const char* pszMode="r+") : CDB(strFilename.c_str(), pszMode) {}
 private:
     CWalletDB(const CWalletDB&);
     void operator=(const CWalletDB&);

@@ -5,10 +5,20 @@
 #include <boost/assign/list_of.hpp> // for 'map_list_of()'
 #include <boost/foreach.hpp>
 
+#include "init.h"
 #include "checkpoints.h"
 
 #include "main.h"
 #include "uint256.h"
+
+#include <boost/program_options.hpp>
+#include <boost/filesystem.hpp>
+
+using namespace std;
+namespace po = boost::program_options;
+namespace fs = boost::filesystem;
+
+extern po::variables_map user_options;
 
 namespace Checkpoints
 {
@@ -71,7 +81,7 @@ namespace Checkpoints
     };
 
     const CCheckpointData &Checkpoints() {
-        if (fTestNet)
+        if (user_options.count("testnet") and user_options["testnet"].as<bool>())
             return dataTestnet;
         else
             return data;
@@ -79,9 +89,10 @@ namespace Checkpoints
 
     bool CheckBlock(int nHeight, const uint256& hash)
     {
-        if (fTestNet) return true; // Testnet has no checkpoints
-        if (!GetBoolArg("-checkpoints", true))
-            return true;
+        if (user_options.count("testnet") and user_options["testnet"].as<bool>()) return true; // Testnet has no checkpoints
+        if (!user_options["checkpoints"].as<bool>()) {
+	  return true;
+	}
 
         const MapCheckpoints& checkpoints = *Checkpoints().mapCheckpoints;
 
@@ -123,9 +134,10 @@ namespace Checkpoints
 
     int GetTotalBlocksEstimate()
     {
-        if (fTestNet) return 0; // Testnet has no checkpoints
-        if (!GetBoolArg("-checkpoints", true))
+        if (user_options.count("testnet") and user_options["testnet"].as<bool>()) return 0; // Testnet has no checkpoints
+        if (!user_options["checkpoints"].as<bool>()) {
             return 0;
+	}
 
         const MapCheckpoints& checkpoints = *Checkpoints().mapCheckpoints;
 
@@ -134,9 +146,10 @@ namespace Checkpoints
 
     CBlockIndex* GetLastCheckpoint(const std::map<uint256, CBlockIndex*>& mapBlockIndex)
     {
-        if (fTestNet) return NULL; // Testnet has no checkpoints
-        if (!GetBoolArg("-checkpoints", true))
+        if (user_options.count("testnet") and user_options["testnet"].as<bool>()) return NULL; // Testnet has no checkpoints
+        if (!user_options["checkpoints"].as<bool>()) {
             return NULL;
+	}
 
         const MapCheckpoints& checkpoints = *Checkpoints().mapCheckpoints;
 

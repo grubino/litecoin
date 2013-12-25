@@ -10,17 +10,20 @@
 #ifndef __INCLUDED_PROTOCOL_H__
 #define __INCLUDED_PROTOCOL_H__
 
+#include <boost/program_options.hpp>
+#include <boost/filesystem.hpp>
+
+namespace po = boost::program_options;
+namespace fs = boost::filesystem;
+
+extern po::variables_map user_options;
+extern po::options_description gen_opts;
+
+
 #include "serialize.h"
 #include "netbase.h"
 #include <string>
 #include "uint256.h"
-
-extern bool fTestNet;
-static inline unsigned short GetDefaultPort(const bool testnet = fTestNet)
-{
-    return testnet ? 19333 : 9333;
-}
-
 
 extern unsigned char pchMessageStart[4];
 

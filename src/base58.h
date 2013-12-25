@@ -23,6 +23,15 @@
 #include "script.h"
 #include "allocators.h"
 
+#include <boost/filesystem.hpp>
+#include <boost/program_options.hpp>
+
+namespace po = boost::program_options;
+namespace fs = boost::filesystem;
+
+extern po::variables_map user_options;
+extern po::options_description gen_opts;
+
 static const char* pszBase58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
 // Encode a byte sequence as a base58-encoded string
@@ -58,7 +67,7 @@ inline std::string EncodeBase58(const unsigned char* pbegin, const unsigned char
     }
 
     // Leading zeroes encoded as base58 zeros
-    for (const unsigned char* p = pbegin; p < pend && *p == 0; p++)
+    for (const unsigned char* p = pbegin; p < pend and *p == 0; p++)
         str += pszBase58[0];
 
     // Convert little endian std::string to big endian
@@ -106,7 +115,7 @@ inline bool DecodeBase58(const char* psz, std::vector<unsigned char>& vchRet)
     std::vector<unsigned char> vchTmp = bn.getvch();
 
     // Trim off sign byte if present
-    if (vchTmp.size() >= 2 && vchTmp.end()[-1] == 0 && vchTmp.end()[-2] >= 0x80)
+    if (vchTmp.size() >= 2 and vchTmp.end()[-1] == 0 and vchTmp.end()[-2] >= 0x80)
         vchTmp.erase(vchTmp.end()-1);
 
     // Restore leading zeros
@@ -279,12 +288,12 @@ public:
     };
 
     bool Set(const CKeyID &id) {
-        SetData(fTestNet ? PUBKEY_ADDRESS_TEST : PUBKEY_ADDRESS, &id, 20);
+        SetData(user_options.count("testnet") and user_options["testnet"].as<bool>() ? PUBKEY_ADDRESS_TEST : PUBKEY_ADDRESS, &id, 20);
         return true;
     }
 
     bool Set(const CScriptID &id) {
-        SetData(fTestNet ? SCRIPT_ADDRESS_TEST : SCRIPT_ADDRESS, &id, 20);
+        SetData(user_options.count("testnet") and user_options["testnet"].as<bool>() ? SCRIPT_ADDRESS_TEST : SCRIPT_ADDRESS, &id, 20);
         return true;
     }
 
@@ -320,7 +329,7 @@ public:
             default:
                 return false;
         }
-        return fExpectTestNet == fTestNet && vchData.size() == nExpectedSize;
+        return fExpectTestNet == user_options.count("testnet") and user_options["testnet"].as<bool>() and vchData.size() == nExpectedSize;
     }
 
     CBitcoinAddress()
@@ -407,7 +416,7 @@ public:
     void SetKey(const CKey& vchSecret)
     {
         assert(vchSecret.IsValid());
-        SetData(fTestNet ? PRIVKEY_ADDRESS_TEST : PRIVKEY_ADDRESS, vchSecret.begin(), vchSecret.size());
+        SetData(user_options.count("testnet") and user_options["testnet"].as<bool>() ? PRIVKEY_ADDRESS_TEST : PRIVKEY_ADDRESS, vchSecret.begin(), vchSecret.size());
         if (vchSecret.IsCompressed())
             vchData.push_back(1);
     }
@@ -415,7 +424,7 @@ public:
     CKey GetKey()
     {
         CKey ret;
-        ret.Set(&vchData[0], &vchData[32], vchData.size() > 32 && vchData[32] == 1);
+        ret.Set(&vchData[0], &vchData[32], vchData.size() > 32 and vchData[32] == 1);
         return ret;
     }
 
@@ -434,12 +443,17 @@ public:
             default:
                 return false;
         }
-        return fExpectTestNet == fTestNet && (vchData.size() == 32 || (vchData.size() == 33 && vchData[32] == 1));
+        return fExpectTestNet == 
+	  (user_options.count("testnet") 
+	   and user_options["testnet"].as<bool>() 
+	  and (vchData.size() == 32 
+	       or (vchData.size() == 33 
+		   and vchData[32] == 1)));
     }
 
     bool SetString(const char* pszSecret)
     {
-        return CBase58Data::SetString(pszSecret) && IsValid();
+        return CBase58Data::SetString(pszSecret) and IsValid();
     }
 
     bool SetString(const std::string& strSecret)

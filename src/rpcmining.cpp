@@ -8,13 +8,23 @@
 #include "init.h"
 #include "bitcoinrpc.h"
 
-using namespace json_spirit;
+#include "ciere/json/value.hpp"
+
+#include <boost/program_options.hpp>
+
+using namespace ciere::json;
 using namespace std;
+
+namespace po = boost::program_options;
+namespace fs = boost::filesystem;
+
+extern po::variables_map user_options;
+extern po::options_description gen_opts;
 
 // Return average network hashes per second based on the last 'lookup' blocks,
 // or from the last difficulty change if 'lookup' is nonpositive.
 // If 'height' is nonnegative, compute the estimate at the time when a given block was found.
-Value GetNetworkHashPS(int lookup, int height) {
+value GetNetworkHashPS(int lookup, int height) {
     CBlockIndex *pb = pindexBest;
 
     if (height >= 0 && height < nBestHeight)
@@ -51,16 +61,16 @@ Value GetNetworkHashPS(int lookup, int height) {
     return (boost::int64_t)(workDiff.getdouble() / timeDiff);
 }
 
-Value getnetworkhashps(const Array& params, bool fHelp)
+value getnetworkhashps(const value& params, bool fHelp)
 {
-    if (fHelp || params.size() > 2)
+    if (fHelp || params.length() > 2)
         throw runtime_error(
             "getnetworkhashps [blocks] [height]\n"
             "Returns the estimated network hashes per second based on the last 120 blocks.\n"
             "Pass in [blocks] to override # of blocks, -1 specifies since last difficulty change.\n"
             "Pass in [height] to estimate the network speed at the time when a certain block was found.");
 
-    return GetNetworkHashPS(params.size() > 0 ? params[0].get_int() : 120, params.size() > 1 ? params[1].get_int() : -1);
+    return GetNetworkHashPS(params.length() > 0 ? params[0].get_as<unsigned int>() : 120, params.length() > 1 ? params[1].get_as<unsigned int>() : -1);
 }
 
 
@@ -85,9 +95,9 @@ void ShutdownRPCMining()
     delete pMiningKey; pMiningKey = NULL;
 }
 
-Value getgenerate(const Array& params, bool fHelp)
+value getgenerate(const value& params, bool fHelp)
 {
-    if (fHelp || params.size() != 0)
+    if (fHelp || params.length() != 0)
         throw runtime_error(
             "getgenerate\n"
             "Returns true or false.");
@@ -95,40 +105,44 @@ Value getgenerate(const Array& params, bool fHelp)
     if (!pMiningKey)
         return false;
 
-    return GetBoolArg("-gen");
+    return user_options["gen"].as<bool>();
 }
 
 
-Value setgenerate(const Array& params, bool fHelp)
+value setgenerate(const value& params, bool fHelp)
 {
-    if (fHelp || params.size() < 1 || params.size() > 2)
+    if (fHelp || params.length() < 1 || params.length() > 2)
         throw runtime_error(
             "setgenerate <generate> [genproclimit]\n"
             "<generate> is true or false to turn generation on or off.\n"
             "Generation is limited to [genproclimit] processors, -1 is unlimited.");
 
     bool fGenerate = true;
-    if (params.size() > 0)
-        fGenerate = params[0].get_bool();
+    if (params.length() > 0)
+        fGenerate = params[0].get_as<bool>();
 
-    if (params.size() > 1)
+    if (params.length() > 1)
     {
-        int nGenProcLimit = params[1].get_int();
-        mapArgs["-genproclimit"] = itostr(nGenProcLimit);
-        if (nGenProcLimit == 0)
-            fGenerate = false;
+
+      unsigned int nGenProcLimit = params[1].get_as<unsigned int>();
+      update_config("--genproclimit"
+		    , itostr(nGenProcLimit));
+
+      if (nGenProcLimit == 0) {
+	fGenerate = false;
+      }
     }
-    mapArgs["-gen"] = (fGenerate ? "1" : "0");
+    update_config("--gen", (fGenerate ? "1" : "0"));
 
     assert(pwalletMain != NULL);
     GenerateBitcoins(fGenerate, pwalletMain);
-    return Value::null;
+    return null_t();
 }
 
 
-Value gethashespersec(const Array& params, bool fHelp)
+value gethashespersec(const value& params, bool fHelp)
 {
-    if (fHelp || params.size() != 0)
+    if (fHelp || params.length() != 0)
         throw runtime_error(
             "gethashespersec\n"
             "Returns a recent hashes per second performance measurement while generating.");
@@ -139,32 +153,34 @@ Value gethashespersec(const Array& params, bool fHelp)
 }
 
 
-Value getmininginfo(const Array& params, bool fHelp)
+value getmininginfo(const value& params, bool fHelp)
 {
-    if (fHelp || params.size() != 0)
+    if (fHelp || params.length() != 0)
         throw runtime_error(
             "getmininginfo\n"
             "Returns an object containing mining-related information.");
 
-    Object obj;
-    obj.push_back(Pair("blocks",        (int)nBestHeight));
-    obj.push_back(Pair("currentblocksize",(uint64_t)nLastBlockSize));
-    obj.push_back(Pair("currentblocktx",(uint64_t)nLastBlockTx));
-    obj.push_back(Pair("difficulty",    (double)GetDifficulty()));
-    obj.push_back(Pair("errors",        GetWarnings("statusbar")));
-    obj.push_back(Pair("generate",      GetBoolArg("-gen")));
-    obj.push_back(Pair("genproclimit",  (int)GetArg("-genproclimit", -1)));
-    obj.push_back(Pair("hashespersec",  gethashespersec(params, false)));
-    obj.push_back(Pair("networkhashps", getnetworkhashps(params, false)));
-    obj.push_back(Pair("pooledtx",      (uint64_t)mempool.size()));
-    obj.push_back(Pair("testnet",       fTestNet));
+    value obj = object()
+      ("blocks",        (int)nBestHeight)
+      ("currentblocksize",(uint64_t)nLastBlockSize)
+      ("currentblocktx",(uint64_t)nLastBlockTx)
+      ("difficulty",    (double)GetDifficulty())
+      ("errors",        GetWarnings("statusbar"))
+      ("generate",      user_options["gen"].as<bool>())
+      ("genproclimit",  user_options["genproclimit"].as<int>())
+      ("hashespersec",  gethashespersec(params, false))
+      ("networkhashps", getnetworkhashps(params, false))
+      ("pooledtx",      (uint64_t)mempool.size())
+      ("testnet",       user_options.count("testnet") and user_options["testnet"].as<bool>())
+      ;
+
     return obj;
 }
 
 
-Value getworkex(const Array& params, bool fHelp)
+value getworkex(const value& params, bool fHelp)
 {
-    if (fHelp || params.size() > 2)
+    if (fHelp || params.length() > 2)
         throw runtime_error(
             "getworkex [data, coinbase]\n"
             "If [data, coinbase] is not specified, returns extended work data.\n"
@@ -181,7 +197,7 @@ Value getworkex(const Array& params, bool fHelp)
     static vector<CBlockTemplate*> vNewBlockTemplate;
     static CReserveKey reservekey(pwalletMain);
 
-    if (params.size() == 0)
+    if (params.length() == 0)
     {
         // Update block
         static unsigned int nTransactionsUpdatedLast;
@@ -241,33 +257,34 @@ Value getworkex(const Array& params, bool fHelp)
         CTransaction coinbaseTx = pblock->vtx[0];
         std::vector<uint256> merkle = pblock->GetMerkleBranch(0);
 
-        Object result;
-        result.push_back(Pair("data",     HexStr(BEGIN(pdata), END(pdata))));
-        result.push_back(Pair("target",   HexStr(BEGIN(hashTarget), END(hashTarget))));
+        value result = object()
+	  ("data",     HexStr(BEGIN(pdata), END(pdata)))
+	  ("target",   HexStr(BEGIN(hashTarget), END(hashTarget)))
+	  ;
 
         CDataStream ssTx(SER_NETWORK, PROTOCOL_VERSION);
         ssTx << coinbaseTx;
-        result.push_back(Pair("coinbase", HexStr(ssTx.begin(), ssTx.end())));
+        result["coinbase"] = HexStr(ssTx.begin(), ssTx.end());
 
-        Array merkle_arr;
+        value merkle_arr;
 
         BOOST_FOREACH(uint256 merkleh, merkle) {
             printf("%s\n", merkleh.ToString().c_str());
             merkle_arr.push_back(HexStr(BEGIN(merkleh), END(merkleh)));
         }
 
-        result.push_back(Pair("merkle", merkle_arr));
+        result["merkle"] = merkle_arr;
 
         return result;
     }
     else
     {
         // Parse parameters
-        vector<unsigned char> vchData = ParseHex(params[0].get_str());
+        vector<unsigned char> vchData = ParseHex(params[0].get_as<std::string>());
         vector<unsigned char> coinbase;
 
-        if(params.size() == 2)
-            coinbase = ParseHex(params[1].get_str());
+        if(params.length() == 2)
+            coinbase = ParseHex(params[1].get_as<std::string>());
 
         if (vchData.size() != 128)
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter");
@@ -298,9 +315,9 @@ Value getworkex(const Array& params, bool fHelp)
 }
 
 
-Value getwork(const Array& params, bool fHelp)
+value getwork(const value& params, bool fHelp)
 {
-    if (fHelp || params.size() > 1)
+    if (fHelp || params.length() > 1)
         throw runtime_error(
             "getwork [data]\n"
             "If [data] is not specified, returns formatted hash data to work on:\n"
@@ -320,7 +337,7 @@ Value getwork(const Array& params, bool fHelp)
     static mapNewBlock_t mapNewBlock;    // FIXME: thread safety
     static vector<CBlockTemplate*> vNewBlockTemplate;
 
-    if (params.size() == 0)
+    if (params.length() == 0)
     {
         // Update block
         static unsigned int nTransactionsUpdatedLast;
@@ -377,17 +394,18 @@ Value getwork(const Array& params, bool fHelp)
 
         uint256 hashTarget = CBigNum().SetCompact(pblock->nBits).getuint256();
 
-        Object result;
-        result.push_back(Pair("midstate", HexStr(BEGIN(pmidstate), END(pmidstate)))); // deprecated
-        result.push_back(Pair("data",     HexStr(BEGIN(pdata), END(pdata))));
-        result.push_back(Pair("hash1",    HexStr(BEGIN(phash1), END(phash1)))); // deprecated
-        result.push_back(Pair("target",   HexStr(BEGIN(hashTarget), END(hashTarget))));
+        value result = object()
+	  ("midstate", HexStr(BEGIN(pmidstate), END(pmidstate)))
+	  ("data",     HexStr(BEGIN(pdata), END(pdata)))
+	  ("hash1",    HexStr(BEGIN(phash1), END(phash1)))
+	  ("target",   HexStr(BEGIN(hashTarget), END(hashTarget)))
+	  ;
         return result;
     }
     else
     {
         // Parse parameters
-        vector<unsigned char> vchData = ParseHex(params[0].get_str());
+        vector<unsigned char> vchData = ParseHex(params[0].get_as<std::string>());
         if (vchData.size() != 128)
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter");
         CBlock* pdata = (CBlock*)&vchData[0];
@@ -412,9 +430,9 @@ Value getwork(const Array& params, bool fHelp)
 }
 
 
-Value getblocktemplate(const Array& params, bool fHelp)
+value getblocktemplate(const value& params, bool fHelp)
 {
-    if (fHelp || params.size() > 1)
+    if (fHelp || params.length() > 1)
         throw runtime_error(
             "getblocktemplate [params]\n"
             "Returns data needed to construct a block to work on:\n"
@@ -435,18 +453,17 @@ Value getblocktemplate(const Array& params, bool fHelp)
             "See https://en.bitcoin.it/wiki/BIP_0022 for full specification.");
 
     std::string strMode = "template";
-    if (params.size() > 0)
+    if (params.length() > 0)
     {
-        const Object& oparam = params[0].get_obj();
-        const Value& modeval = find_value(oparam, "mode");
-        if (modeval.type() == str_type)
-            strMode = modeval.get_str();
-        else if (modeval.type() == null_type)
-        {
-            /* Do nothing */
-        }
-        else
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid mode");
+      const value& oparam = params[0];
+      const value& modeval = oparam["mode"];
+      if (modeval.type() == string_type) {
+	strMode = modeval.get_as<std::string>();
+      } else if (modeval == null_t()) {
+	;
+      } else {
+	throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid mode");
+      }
     }
 
     if (strMode != "template")
@@ -494,82 +511,81 @@ Value getblocktemplate(const Array& params, bool fHelp)
     pblock->UpdateTime(pindexPrev);
     pblock->nNonce = 0;
 
-    Array transactions;
+    value transactions = array();
     map<uint256, int64_t> setTxIndex;
     int i = 0;
-    BOOST_FOREACH (CTransaction& tx, pblock->vtx)
-    {
-        uint256 txHash = tx.GetHash();
-        setTxIndex[txHash] = i++;
+    BOOST_FOREACH (CTransaction& tx, pblock->vtx) {
+      uint256 txHash = tx.GetHash();
+      setTxIndex[txHash] = i++;
 
-        if (tx.IsCoinBase())
-            continue;
+      if (tx.IsCoinBase()) {
+	continue;
+      }
 
-        Object entry;
+      value entry = object();
+      
+      CDataStream ssTx(SER_NETWORK, PROTOCOL_VERSION);
+      ssTx << tx;
+      entry["data"] = HexStr(ssTx.begin(), ssTx.end());
+      entry["hash"] = txHash.GetHex();
 
-        CDataStream ssTx(SER_NETWORK, PROTOCOL_VERSION);
-        ssTx << tx;
-        entry.push_back(Pair("data", HexStr(ssTx.begin(), ssTx.end())));
+      value deps = array();
+      BOOST_FOREACH (const CTxIn &in, tx.vin) {
+	if (setTxIndex.count(in.prevout.hash)) {
+	  deps.push_back(setTxIndex[in.prevout.hash]);
+	}
+      }
+      entry["depends"] = deps;
 
-        entry.push_back(Pair("hash", txHash.GetHex()));
+      int index_in_template = i - 1;
+      entry["fee"] = pblocktemplate->vTxFees[index_in_template];
+      entry["sigops"] = pblocktemplate->vTxSigOps[index_in_template];
 
-        Array deps;
-        BOOST_FOREACH (const CTxIn &in, tx.vin)
-        {
-            if (setTxIndex.count(in.prevout.hash))
-                deps.push_back(setTxIndex[in.prevout.hash]);
-        }
-        entry.push_back(Pair("depends", deps));
-
-        int index_in_template = i - 1;
-        entry.push_back(Pair("fee", pblocktemplate->vTxFees[index_in_template]));
-        entry.push_back(Pair("sigops", pblocktemplate->vTxSigOps[index_in_template]));
-
-        transactions.push_back(entry);
+      transactions.push_back(entry);
     }
 
-    Object aux;
-    aux.push_back(Pair("flags", HexStr(COINBASE_FLAGS.begin(), COINBASE_FLAGS.end())));
+    value aux = object()("flags", HexStr(COINBASE_FLAGS.begin(), COINBASE_FLAGS.end()));
 
     uint256 hashTarget = CBigNum().SetCompact(pblock->nBits).getuint256();
 
-    static Array aMutable;
-    if (aMutable.empty())
+    static value aMutable = array();
+    if (aMutable.length() == 0)
     {
         aMutable.push_back("time");
         aMutable.push_back("transactions");
         aMutable.push_back("prevblock");
     }
 
-    Object result;
-    result.push_back(Pair("version", pblock->nVersion));
-    result.push_back(Pair("previousblockhash", pblock->hashPrevBlock.GetHex()));
-    result.push_back(Pair("transactions", transactions));
-    result.push_back(Pair("coinbaseaux", aux));
-    result.push_back(Pair("coinbasevalue", (int64_t)pblock->vtx[0].vout[0].nValue));
-    result.push_back(Pair("target", hashTarget.GetHex()));
-    result.push_back(Pair("mintime", (int64_t)pindexPrev->GetMedianTimePast()+1));
-    result.push_back(Pair("mutable", aMutable));
-    result.push_back(Pair("noncerange", "00000000ffffffff"));
-    result.push_back(Pair("sigoplimit", (int64_t)MAX_BLOCK_SIGOPS));
-    result.push_back(Pair("sizelimit", (int64_t)MAX_BLOCK_SIZE));
-    result.push_back(Pair("curtime", (int64_t)pblock->nTime));
-    result.push_back(Pair("bits", HexBits(pblock->nBits)));
-    result.push_back(Pair("height", (int64_t)(pindexPrev->nHeight+1)));
+    value result = object()
+      ("version", pblock->nVersion)
+      ("previousblockhash", pblock->hashPrevBlock.GetHex())
+      ("transactions", transactions)
+      ("coinbaseaux", aux)
+      ("coinbasevalue", (int64_t)pblock->vtx[0].vout[0].nValue)
+      ("target", hashTarget.GetHex())
+      ("mintime", (int64_t)pindexPrev->GetMedianTimePast()+1)
+      ("mutable", aMutable)
+      ("noncerange", "00000000ffffffff")
+      ("sigoplimit", (int64_t)MAX_BLOCK_SIGOPS)
+      ("sizelimit", (int64_t)MAX_BLOCK_SIZE)
+      ("curtime", (int64_t)pblock->nTime)
+      ("bits", HexBits(pblock->nBits))
+      ("height", (int64_t)(pindexPrev->nHeight+1))
+      ;
 
     return result;
 }
 
-Value submitblock(const Array& params, bool fHelp)
+value submitblock(const value& params, bool fHelp)
 {
-    if (fHelp || params.size() < 1 || params.size() > 2)
+    if (fHelp || params.length() < 1 || params.length() > 2)
         throw runtime_error(
             "submitblock <hex data> [optional-params-obj]\n"
             "[optional-params-obj] parameter is currently ignored.\n"
             "Attempts to submit new block to network.\n"
             "See https://en.bitcoin.it/wiki/BIP_0022 for full specification.");
 
-    vector<unsigned char> blockData(ParseHex(params[0].get_str()));
+    vector<unsigned char> blockData(ParseHex(params[0].get_as<std::string>()));
     CDataStream ssBlock(blockData, SER_NETWORK, PROTOCOL_VERSION);
     CBlock pblock;
     try {
@@ -584,5 +600,5 @@ Value submitblock(const Array& params, bool fHelp)
     if (!fAccepted)
         return "rejected"; // TODO: report validation state
 
-    return Value::null;
+    return null_t();
 }

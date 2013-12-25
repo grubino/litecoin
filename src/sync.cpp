@@ -4,8 +4,16 @@
 
 #include "sync.h"
 #include "util.h"
+#include "init.h"
 
 #include <boost/foreach.hpp>
+
+#include <boost/program_options.hpp>
+namespace po = boost::program_options;
+namespace fs = boost::filesystem;
+
+extern po::variables_map user_options;
+
 
 #ifdef DEBUG_LOCKCONTENTION
 void PrintLockContention(const char* pszName, const char* pszFile, int nLine)
@@ -78,7 +86,7 @@ static void push_lock(void* c, const CLockLocation& locklocation, bool fTry)
     if (lockstack.get() == NULL)
         lockstack.reset(new LockStack);
 
-    if (fDebug) printf("Locking: %s\n", locklocation.ToString().c_str());
+    if (user_options.count("debug") and user_options["debug"].as<bool>()) printf("Locking: %s\n", locklocation.ToString().c_str());
     dd_mutex.lock();
 
     (*lockstack).push_back(std::make_pair(c, locklocation));
@@ -105,7 +113,7 @@ static void push_lock(void* c, const CLockLocation& locklocation, bool fTry)
 
 static void pop_lock()
 {
-    if (fDebug)
+    if (user_options.count("debug") and user_options["debug"].as<bool>())
     {
         const CLockLocation& locklocation = (*lockstack).rbegin()->second;
         printf("Unlocked: %s\n", locklocation.ToString().c_str());
