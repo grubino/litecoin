@@ -2,6 +2,8 @@
 // Unit tests for alert system
 //
 
+#include "config.h"
+
 #include <boost/foreach.hpp>
 #include <boost/test/unit_test.hpp>
 #include <fstream>
@@ -164,8 +166,7 @@ BOOST_AUTO_TEST_CASE(AlertNotify)
     boost::filesystem::path temp = GetTempPath() / "alertnotify.txt";
     boost::filesystem::remove(temp);
 
-    mapArgs["-alertnotify"] = std::string("echo %s >> ") + temp.string();
-
+    update_config("alertnotify", std::string("echo %s >> ") + temp.string());
     BOOST_FOREACH(CAlert alert, alerts)
         alert.ProcessAlert(false);
 

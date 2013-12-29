@@ -5,20 +5,17 @@
 #include <boost/assign/list_of.hpp> // for 'map_list_of()'
 #include <boost/foreach.hpp>
 
+#include "config.h"
 #include "init.h"
 #include "checkpoints.h"
 
 #include "main.h"
 #include "uint256.h"
 
-#include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
 
 using namespace std;
-namespace po = boost::program_options;
 namespace fs = boost::filesystem;
-
-extern po::variables_map user_options;
 
 namespace Checkpoints
 {

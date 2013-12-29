@@ -3,6 +3,7 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "config.h"
 #include "wallet.h"
 #include "walletdb.h"
 #include "crypter.h"
@@ -12,10 +13,6 @@
 #include <boost/algorithm/string/replace.hpp>
 
 using namespace std;
-
-#include <boost/program_options.hpp>
-namespace po = boost::program_options;
-extern po::variables_map user_options;
 
 
 //////////////////////////////////////////////////////////////////////////////
@@ -1569,7 +1566,8 @@ bool CWallet::TopUpKeyPool()
         CWalletDB walletdb(strWalletFile);
 
         // Top up key pool
-        unsigned int nTargetSize = max(user_options["-keypool"].as<unsigned int>(), 0u);
+        unsigned int nTargetSize = 
+	  max(user_options["keypool"].as<unsigned int>(), 0u);
         while (setKeyPool.size() < (nTargetSize + 1))
         {
             int64 nEnd = 1;

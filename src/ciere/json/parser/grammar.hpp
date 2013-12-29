@@ -51,4 +51,6 @@ namespace ciere { namespace json { namespace parser
 
 }}}
 
+#include "grammar_def.hpp"
+
 #endif  // CIERE_JSON_DETAIL_GRAMMAR_HPP

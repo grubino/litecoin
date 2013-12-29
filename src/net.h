@@ -5,14 +5,10 @@
 #ifndef BITCOIN_NET_H
 #define BITCOIN_NET_H
 
+#include "config.h"
+
 #include <boost/filesystem.hpp>
-#include <boost/program_options.hpp>
-
-namespace po = boost::program_options;
 namespace fs = boost::filesystem;
-
-extern po::variables_map user_options;
-extern po::options_description gen_opts;
 
 #include <deque>
 #include <boost/array.hpp>

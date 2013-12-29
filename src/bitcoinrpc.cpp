@@ -31,11 +31,7 @@ using namespace boost;
 using namespace boost::asio;
 using namespace ciere::json;
 
-#include <boost/program_options.hpp>
-namespace po = boost::program_options;
 namespace fs = boost::filesystem;
-
-extern po::variables_map user_options;
 
 static std::map<value_types, std::string> value_type_name = 
   boost::assign::map_list_of

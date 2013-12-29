@@ -8,6 +8,7 @@
 using namespace std;
 using namespace boost;
 
+#include "config.h"
 #include "script.h"
 #include "keystore.h"
 #include "bignum.h"
@@ -16,13 +17,14 @@ using namespace boost;
 #include "sync.h"
 #include "util.h"
 
-bool CheckSig(vector<unsigned char> vchSig, const vector<unsigned char> &vchPubKey, const CScript &scriptCode, const CTransaction& txTo, unsigned int nIn, int nHashType, int flags);
+bool CheckSig(vector<unsigned char> vchSig
+	      , const vector<unsigned char> &vchPubKey
+	      , const CScript &scriptCode
+	      , const CTransaction& txTo
+	      , unsigned int nIn
+	      , int nHashType
+	      , int flags);
 
-#include <boost/program_options.hpp>
-
-namespace po = boost::program_options;
-
-extern po::variables_map user_options;
 
 typedef vector<unsigned char> valtype;
 static const valtype vchFalse(0);

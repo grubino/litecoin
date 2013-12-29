@@ -2,21 +2,23 @@
 #include <boost/foreach.hpp>
 #include <boost/test/unit_test.hpp>
 
+#include "config.h"
 #include "base58.h"
 #include "util.h"
 #include "bitcoinrpc.h"
 
+#include "ciere/json/value.hpp"
+
 using namespace std;
-using namespace json_spirit;
+using namespace ciere::json;
 
 BOOST_AUTO_TEST_SUITE(rpc_tests)
 
-static Array
-createArgs(int nRequired, const char* address1=NULL, const char* address2=NULL)
-{
-    Array result;
+static value
+createArgs(int nRequired, const char* address1=NULL, const char* address2=NULL) {
+    value result;
     result.push_back(nRequired);
-    Array addresses;
+    value addresses;
     if (address1) addresses.push_back(address1);
     if (address2) addresses.push_back(address2);
     result.push_back(addresses);
@@ -32,18 +34,18 @@ BOOST_AUTO_TEST_CASE(rpc_addmultisig)
     // new, compressed:
     const char address2Hex[] = "0388c2037017c62240b6b72ac1a2a5f94da790596ebd06177c8572752922165cb4";
 
-    Value v;
+    value v;
     CBitcoinAddress address;
     BOOST_CHECK_NO_THROW(v = addmultisig(createArgs(1, address1Hex), false));
-    address.SetString(v.get_str());
+    address.SetString(v.get_as<std::string>());
     BOOST_CHECK(address.IsValid() && address.IsScript());
 
     BOOST_CHECK_NO_THROW(v = addmultisig(createArgs(1, address1Hex, address2Hex), false));
-    address.SetString(v.get_str());
+    address.SetString(v.get_as<std::string>());
     BOOST_CHECK(address.IsValid() && address.IsScript());
 
     BOOST_CHECK_NO_THROW(v = addmultisig(createArgs(2, address1Hex, address2Hex), false));
-    address.SetString(v.get_str());
+    address.SetString(v.get_as<std::string>());
     BOOST_CHECK(address.IsValid() && address.IsScript());
 
     BOOST_CHECK_THROW(addmultisig(createArgs(0), false), runtime_error);
@@ -60,29 +62,29 @@ BOOST_AUTO_TEST_CASE(rpc_addmultisig)
     BOOST_CHECK_THROW(addmultisig(createArgs(2, short2.c_str()), false), runtime_error);
 }
 
-static Value CallRPC(string args)
+static value CallRPC(string args)
 {
     vector<string> vArgs;
     boost::split(vArgs, args, boost::is_any_of(" \t"));
     string strMethod = vArgs[0];
     vArgs.erase(vArgs.begin());
-    Array params = RPCConvertValues(strMethod, vArgs);
+    value params = RPCConvertValues(strMethod, vArgs);
 
     rpcfn_type method = tableRPC[strMethod]->actor;
     try {
-        Value result = (*method)(params, false);
+        value result = (*method)(params, false);
         return result;
     }
-    catch (Object& objError)
+    catch (value& objError)
     {
-        throw runtime_error(find_value(objError, "message").get_str());
+        throw runtime_error(objError["message"].get_as<std::string>());
     }
 }
 
 BOOST_AUTO_TEST_CASE(rpc_wallet)
 {
     // Test RPC calls for various wallet statistics
-    Value r;
+    value r;
 
     BOOST_CHECK_NO_THROW(CallRPC("listunspent"));
     BOOST_CHECK_THROW(CallRPC("listunspent string"), runtime_error);
@@ -90,7 +92,7 @@ BOOST_AUTO_TEST_CASE(rpc_wallet)
     BOOST_CHECK_THROW(CallRPC("listunspent 0 1 not_array"), runtime_error);
     BOOST_CHECK_THROW(CallRPC("listunspent 0 1 [] extra"), runtime_error);
     BOOST_CHECK_NO_THROW(r=CallRPC("listunspent 0 1 []"));
-    BOOST_CHECK(r.get_array().empty());
+    BOOST_CHECK(boost::get<array_t>(r.get_ast()).empty());
 
     BOOST_CHECK_NO_THROW(CallRPC("listreceivedbyaddress"));
     BOOST_CHECK_NO_THROW(CallRPC("listreceivedbyaddress 0"));
@@ -111,7 +113,7 @@ BOOST_AUTO_TEST_CASE(rpc_wallet)
 BOOST_AUTO_TEST_CASE(rpc_rawparams)
 {
     // Test raw transaction API argument handling
-    Value r;
+    value r;
 
     BOOST_CHECK_THROW(CallRPC("getrawtransaction"), runtime_error);
     BOOST_CHECK_THROW(CallRPC("getrawtransaction not_hex"), runtime_error);
@@ -130,8 +132,8 @@ BOOST_AUTO_TEST_CASE(rpc_rawparams)
     BOOST_CHECK_THROW(CallRPC("decoderawtransaction DEADBEEF"), runtime_error);
     string rawtx = "0100000001a15d57094aa7a21a28cb20b59aab8fc7d1149a3bdbcddba9c622e4f5f6a99ece010000006c493046022100f93bb0e7d8db7bd46e40132d1f8242026e045f03a0efe71bbb8e3f475e970d790221009337cd7f1f929f00cc6ff01f03729b069a7c21b59b1736ddfee5db5946c5da8c0121033b9b137ee87d5a812d6f506efdd37f0affa7ffc310711c06c7f3e097c9447c52ffffffff0100e1f505000000001976a9140389035a9225b3839e2bbf32d826a1e222031fd888ac00000000";
     BOOST_CHECK_NO_THROW(r = CallRPC(string("decoderawtransaction ")+rawtx));
-    BOOST_CHECK_EQUAL(find_value(r.get_obj(), "version").get_int(), 1);
-    BOOST_CHECK_EQUAL(find_value(r.get_obj(), "locktime").get_int(), 0);
+    BOOST_CHECK_EQUAL(r["version"].get_as<int>(), 1);
+    BOOST_CHECK_EQUAL(r["locktime"].get_as<int>(), 0);
     BOOST_CHECK_THROW(r = CallRPC(string("decoderawtransaction ")+rawtx+" extra"), runtime_error);
 
     BOOST_CHECK_THROW(CallRPC("signrawtransaction"), runtime_error);
@@ -151,7 +153,7 @@ BOOST_AUTO_TEST_CASE(rpc_rawparams)
 
 BOOST_AUTO_TEST_CASE(rpc_rawsign)
 {
-    Value r;
+    value r;
     // input is a 1-of-2 multisig (so is output):
     string prevout =
       "[{\"txid\":\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\","
@@ -159,13 +161,13 @@ BOOST_AUTO_TEST_CASE(rpc_rawsign)
       "\"redeemScript\":\"512103debedc17b3df2badbcdd86d5feb4562b86fe182e5998abd8bcd4f122c6155b1b21027e940bb73ab8732bfdf7f9216ecefca5b94d6df834e77e108f68e66f126044c052ae\"}]";
     r = CallRPC(string("createrawtransaction ")+prevout+" "+
       "{\"3HqAe9LtNBjnsfM4CyYaWTnvCaUYT7v4oZ\":11}");
-    string notsigned = r.get_str();
+    string notsigned = r.get_as<std::string>();
     string privkey1 = "\"T6hoRM7L8u4f9vHd4eGMAmwV6AMCE11PvYi7YjrdegG223kw64r1\"";
     string privkey2 = "\"T5Xu6pe5iqQYqXGxhcY2QEFr7NNoVQ5R6A4abpswunCTF9w85g8V\"";
     r = CallRPC(string("signrawtransaction ")+notsigned+" "+prevout+" "+"[]");
-    BOOST_CHECK(find_value(r.get_obj(), "complete").get_bool() == false);
+    BOOST_CHECK(r["complete"].get_as<bool>() == false);
     r = CallRPC(string("signrawtransaction ")+notsigned+" "+prevout+" "+"["+privkey1+","+privkey2+"]");
-    BOOST_CHECK(find_value(r.get_obj(), "complete").get_bool() == true);
+    BOOST_CHECK(r["complete"].get_as<bool>() == true);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

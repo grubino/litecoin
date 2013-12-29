@@ -18,19 +18,14 @@
 #include <string>
 #include <vector>
 
+#include "config.h"
 #include "bignum.h"
 #include "key.h"
 #include "script.h"
 #include "allocators.h"
 
 #include <boost/filesystem.hpp>
-#include <boost/program_options.hpp>
-
-namespace po = boost::program_options;
 namespace fs = boost::filesystem;
-
-extern po::variables_map user_options;
-extern po::options_description gen_opts;
 
 static const char* pszBase58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 

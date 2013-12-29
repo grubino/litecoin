@@ -6,15 +6,7 @@
 #define BITCOIN_INIT_H
 
 #include "wallet.h"
-
-#include <boost/program_options.hpp>
-#include <boost/filesystem.hpp>
-
-namespace po = boost::program_options;
-namespace fs = boost::filesystem;
-
-extern po::variables_map user_options;
-extern po::options_description gen_opts;
+#include "config.h"
 
 extern CWallet* pwalletMain;
 

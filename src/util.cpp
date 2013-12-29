@@ -13,6 +13,7 @@
 #include <sys/resource.h>
 #endif
 
+#include "config.h"
 #include "util.h"
 #include "sync.h"
 #include "version.h"
@@ -25,10 +26,6 @@
 
 namespace po = boost::program_options;
 namespace fs = boost::filesystem;
-
-extern po::variables_map user_options;
-extern po::options_description gen_opts;
-
 
 // Work around clang compilation problem in Boost 1.46:
 // /usr/include/boost/program_options/detail/config_file.hpp:163:17: error: call to function 'to_internal' that is neither visible in the template definition nor found by argument-dependent lookup
@@ -223,7 +220,9 @@ static void DebugPrintInit()
     assert(fileout == NULL);
     assert(mutexDebugLog == NULL);
 
-    boost::filesystem::path pathDebug = user_options["datadir"].as<fs::path>() / "debug.log";
+    boost::filesystem::path pathDebug = user_options.count("datadir") ? 
+      user_options["datadir"].as<fs::path>() / "debug.log"
+      : GetDefaultDataDir() / "debug.log";
     fileout = fopen(pathDebug.string().c_str(), "a");
     if (fileout) setbuf(fileout, NULL); // unbuffered
 

@@ -1,7 +1,10 @@
 //
 // Unit tests for canonical signatures
 
-#include "json/json_spirit_writer_template.h"
+#include "config.h"
+#include "ciere/json/value.hpp"
+#include "ciere/json/io.hpp"
+
 #include <boost/test/unit_test.hpp>
 #include <openssl/ecdsa.h>
 
@@ -10,11 +13,9 @@
 #include "util.h"
 
 using namespace std;
-using namespace json_spirit;
+using namespace ciere::json;
 
-
-// In script_tests.cpp
-extern Array read_json(const std::string& filename);
+#include "json_io_helpers.h"
 
 BOOST_AUTO_TEST_SUITE(canonical_tests)
 
@@ -58,10 +59,10 @@ bool static IsCanonicalSignature_OpenSSL(const std::vector<unsigned char> &vchSi
 
 BOOST_AUTO_TEST_CASE(script_canon)
 {
-    Array tests = read_json("sig_canonical.json");
+    value tests = read_json("sig_canonical.json");
 
-    BOOST_FOREACH(Value &tv, tests) {
-        string test = tv.get_str();
+    BOOST_FOREACH(value &tv, boost::get<array_t>(tests.get_ast())) {
+        string test = tv.get_as<std::string>();
         if (IsHex(test)) {
             std::vector<unsigned char> sig = ParseHex(test);
             BOOST_CHECK_MESSAGE(IsCanonicalSignature(sig), test);
@@ -72,10 +73,10 @@ BOOST_AUTO_TEST_CASE(script_canon)
 
 BOOST_AUTO_TEST_CASE(script_noncanon)
 {
-    Array tests = read_json("sig_noncanonical.json");
+    value tests = read_json("sig_noncanonical.json");
 
-    BOOST_FOREACH(Value &tv, tests) {
-        string test = tv.get_str();
+    BOOST_FOREACH(value &tv, boost::get<array_t>(tests.get_ast())) {
+        string test = tv.get_as<std::string>();
         if (IsHex(test)) {
             std::vector<unsigned char> sig = ParseHex(test);
             BOOST_CHECK_MESSAGE(!IsCanonicalSignature(sig), test);

@@ -5,19 +5,15 @@
 #ifndef BITCOIN_DB_H
 #define BITCOIN_DB_H
 
+#include "config.h"
 #include "main.h"
 
 #include <map>
 #include <string>
 #include <vector>
 
-#include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
-
-namespace po = boost::program_options;
 namespace fs = boost::filesystem;
-
-extern po::variables_map user_options;
 
 #include <db_cxx.h>
 

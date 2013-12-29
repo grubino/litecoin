@@ -146,7 +146,9 @@ OBJS= \
     obj/leveldb.o \
     obj/txdb.o \
     obj/value.o \
-    obj/io.o
+    obj/io.o \
+    obj/json_io_helpers.o \
+    obj/config.o
 
 
 ifdef USE_SSE2

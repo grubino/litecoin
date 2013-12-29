@@ -3,15 +3,12 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "config.h"
 #include "txdb.h"
 #include "main.h"
 #include "hash.h"
 
-#include <boost/program_options.hpp>
-namespace po = boost::program_options;
 namespace fs = boost::filesystem;
-
-extern po::variables_map user_options;
 
 using namespace std;
 
@@ -26,7 +23,11 @@ void static BatchWriteHashBestChain(CLevelDBBatch &batch, const uint256 &hash) {
     batch.Write('B', hash);
 }
 
-CCoinsViewDB::CCoinsViewDB(size_t nCacheSize, bool fMemory, bool fWipe) : db(user_options["datadir"].as<fs::path>() / "chainstate", nCacheSize, fMemory, fWipe) {
+CCoinsViewDB::CCoinsViewDB(const fs::path& datadir
+			   , size_t nCacheSize
+			   , bool fMemory
+			   , bool fWipe) 
+  : db(datadir / "chainstate", nCacheSize, fMemory, fWipe) {
 }
 
 bool CCoinsViewDB::GetCoins(const uint256 &txid, CCoins &coins) { 
@@ -71,7 +72,13 @@ bool CCoinsViewDB::BatchWrite(const std::map<uint256, CCoins> &mapCoins, CBlockI
     return db.WriteBatch(batch);
 }
 
-CBlockTreeDB::CBlockTreeDB(size_t nCacheSize, bool fMemory, bool fWipe) : CLevelDB(user_options["datadir"].as<fs::path>() / "blocks" / "index", nCacheSize, fMemory, fWipe) {
+CBlockTreeDB::CBlockTreeDB(const fs::path& data_path
+			   , size_t nCacheSize
+			   , bool fMemory
+			   , bool fWipe) : CLevelDB(data_path / "blocks" / "index"
+						    , nCacheSize
+						    , fMemory
+						    , fWipe) {
 }
 
 bool CBlockTreeDB::WriteBlockIndex(const CDiskBlockIndex& blockindex)

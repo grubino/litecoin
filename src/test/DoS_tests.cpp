@@ -8,6 +8,7 @@
 #include <boost/test/unit_test.hpp>
 #include <boost/foreach.hpp>
 
+#include "config.h"
 #include "main.h"
 #include "wallet.h"
 #include "net.h"
@@ -25,7 +26,7 @@ CService ip(uint32_t i)
 {
     struct in_addr s;
     s.s_addr = i;
-    return CService(CNetAddr(s), GetDefaultPort());
+    return CService(CNetAddr(s), user_options["port"].as<unsigned int>());
 }
 
 BOOST_AUTO_TEST_SUITE(DoS_tests)
@@ -51,7 +52,7 @@ BOOST_AUTO_TEST_CASE(DoS_banning)
 BOOST_AUTO_TEST_CASE(DoS_banscore)
 {
     CNode::ClearBanned();
-    mapArgs["-banscore"] = "111"; // because 11 is my favorite number
+    update_config("banscore", "114"); // because 14 is my favorite number
     CAddress addr1(ip(0xa0b0c001));
     CNode dummyNode1(INVALID_SOCKET, addr1, "", true);
     dummyNode1.Misbehaving(100);
@@ -60,7 +61,7 @@ BOOST_AUTO_TEST_CASE(DoS_banscore)
     BOOST_CHECK(!CNode::IsBanned(addr1));
     dummyNode1.Misbehaving(1);
     BOOST_CHECK(CNode::IsBanned(addr1));
-    mapArgs.erase("-banscore");
+    update_config("banscore", "");
 }
 
 BOOST_AUTO_TEST_CASE(DoS_bantime)
@@ -258,7 +259,7 @@ BOOST_AUTO_TEST_CASE(DoS_checkSig)
     boost::posix_time::ptime mst2 = boost::posix_time::microsec_clock::local_time();
     boost::posix_time::time_duration msdiff = mst2 - mst1;
     long nOneValidate = msdiff.total_milliseconds();
-    if (fDebug) printf("DoS_Checksig sign: %ld\n", nOneValidate);
+    if (user_options["debug"].as<bool>()) printf("DoS_Checksig sign: %ld\n", nOneValidate);
 
     // ... now validating repeatedly should be quick:
     // 2.8GHz machine, -g build: Sign takes ~760ms,
@@ -271,7 +272,7 @@ BOOST_AUTO_TEST_CASE(DoS_checkSig)
     mst2 = boost::posix_time::microsec_clock::local_time();
     msdiff = mst2 - mst1;
     long nManyValidate = msdiff.total_milliseconds();
-    if (fDebug) printf("DoS_Checksig five: %ld\n", nManyValidate);
+    if (user_options["debug"].as<bool>()) printf("DoS_Checksig five: %ld\n", nManyValidate);
 
     BOOST_CHECK_MESSAGE(nManyValidate < nOneValidate, "Signature cache timing failed");
 
@@ -288,14 +289,15 @@ BOOST_AUTO_TEST_CASE(DoS_checkSig)
     std::swap(tx.vin[0].scriptSig, tx.vin[1].scriptSig);
 
     // Exercise -maxsigcachesize code:
-    mapArgs["-maxsigcachesize"] = "10";
+    update_config("maxsigcachesize", "10");
     // Generate a new, different signature for vin[0] to trigger cache clear:
     CScript oldSig = tx.vin[0].scriptSig;
     BOOST_CHECK(SignSignature(keystore, orphans[0], tx, 0));
     BOOST_CHECK(tx.vin[0].scriptSig != oldSig);
-    for (unsigned int j = 0; j < tx.vin.size(); j++)
-        BOOST_CHECK(VerifySignature(CCoins(orphans[j], MEMPOOL_HEIGHT), tx, j, flags, SIGHASH_ALL));
-    mapArgs.erase("-maxsigcachesize");
+    for (unsigned int j = 0; j < tx.vin.size(); j++) {
+      BOOST_CHECK(VerifySignature(CCoins(orphans[j], MEMPOOL_HEIGHT), tx, j, flags, SIGHASH_ALL));
+    }
+    update_config("maxsigcachesize", "");
 
     LimitOrphanTxSize(0);
 }

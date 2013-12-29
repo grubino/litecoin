@@ -102,8 +102,9 @@ bool CDBEnv::Open(const boost::filesystem::path& pathIn)
 
 void CDBEnv::MakeMock()
 {
-    if (fDbEnvInit)
+  if (fDbEnvInit) {
         throw runtime_error("CDBEnv::MakeMock(): already initialized");
+  }
 
     boost::this_thread::interruption_point();
 
@@ -125,8 +126,9 @@ void CDBEnv::MakeMock()
                      DB_THREAD     |
                      DB_PRIVATE,
                      S_IRUSR | S_IWUSR);
-    if (ret > 0)
+    if (ret > 0) {
         throw runtime_error(strprintf("CDBEnv::MakeMock(): error %d opening database environment", ret));
+    }
 
     fDbEnvInit = true;
     fMockDb = true;

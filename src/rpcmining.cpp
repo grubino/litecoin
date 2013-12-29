@@ -3,6 +3,7 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "config.h"
 #include "main.h"
 #include "db.h"
 #include "init.h"
@@ -10,16 +11,10 @@
 
 #include "ciere/json/value.hpp"
 
-#include <boost/program_options.hpp>
-
 using namespace ciere::json;
 using namespace std;
 
-namespace po = boost::program_options;
 namespace fs = boost::filesystem;
-
-extern po::variables_map user_options;
-extern po::options_description gen_opts;
 
 // Return average network hashes per second based on the last 'lookup' blocks,
 // or from the last difficulty change if 'lookup' is nonpositive.
